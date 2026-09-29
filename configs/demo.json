@@ -1,0 +1,18 @@
+{
+  "training": {
+    "seed": 42,
+    "epochs": 18,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "temperature": 0.07,
+    "patterns_per_batch": 3,
+    "members_per_pattern": 2,
+    "patience": 5,
+    "minimum_delta": 0.00001
+  },
+  "variants": ["v1", "v11", "v2"],
+  "k_values": [1, 5, 10, 30],
+  "save_checkpoints": false,
+  "plots": true,
+  "cpu_threads": 1
+}

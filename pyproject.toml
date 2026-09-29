@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multimodal-pattern-aware-training"
+version = "0.1.0"
+description = "Reproducible synthetic multimodal retrieval with pattern-balanced contrastive training"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "shobowale123"}]
+dependencies = ["numpy>=1.26,<3", "pandas>=2.2,<3", "torch>=2.6,<3"]
+
+[project.optional-dependencies]
+demo = ["matplotlib>=3.9,<4", "jupyterlab>=4.3,<5", "nbclient>=0.10,<1", "nbformat>=5.10,<6", "ipykernel>=6.29,<7"]
+dev = ["pytest>=8.3,<9", "build>=1.2,<2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,0 +1,508 @@
+{
+  "schema_version": 1,
+  "data_kind": "synthetic_only",
+  "config": {
+    "training": {
+      "epochs": 18,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "temperature": 0.07,
+      "patterns_per_batch": 3,
+      "members_per_pattern": 2,
+      "patience": 5,
+      "minimum_delta": 1e-05,
+      "seed": 42
+    },
+    "variants": [
+      "v1",
+      "v11",
+      "v2"
+    ],
+    "k_values": [
+      1,
+      5,
+      10,
+      30
+    ],
+    "save_checkpoints": false,
+    "plots": true,
+    "cpu_threads": 1
+  },
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.2.4",
+    "pandas": "2.2.3",
+    "torch": "2.6.0+cpu",
+    "device": "cpu",
+    "cpu_threads": 1,
+    "deterministic_algorithms": true
+  },
+  "data_audit": {
+    "rows": 48,
+    "eligible_rows": 47,
+    "all_missing_rows": 1,
+    "available_by_modality": {
+      "location": 45,
+      "time": 43,
+      "narrative": 43,
+      "suspect": 30,
+      "weapon": 27
+    },
+    "source_available": {
+      "suspect": 37,
+      "weapon": 35
+    },
+    "mask_code_counts": {
+      "0": 1,
+      "3": 1,
+      "6": 1,
+      "7": 3,
+      "11": 2,
+      "13": 2,
+      "15": 11,
+      "21": 1,
+      "23": 11,
+      "27": 1,
+      "29": 1,
+      "30": 1,
+      "31": 12
+    }
+  },
+  "splits": {
+    "train": {
+      "patterns": 7,
+      "records": 28,
+      "eligible_records": 28
+    },
+    "validation": {
+      "patterns": 3,
+      "records": 12,
+      "eligible_records": 12
+    },
+    "test": {
+      "patterns": 2,
+      "records": 8,
+      "eligible_records": 7
+    }
+  },
+  "sampler": {
+    "eligible_patterns": 7,
+    "eligible_members": 28,
+    "ineligible_patterns": 0,
+    "patterns_per_batch": 3,
+    "members_per_pattern": 2,
+    "batches": 3
+  },
+  "models": {
+    "v1": {
+      "name": "V1 global gates",
+      "parameter_count": 1025413,
+      "selected_epoch": 9,
+      "epochs_executed": 14,
+      "validation_selection_ndcg_at_30": 1.0,
+      "validation": {
+        "available_gallery_records": 12,
+        "eligible_query_records": 12,
+        "eligible_patterns": 3,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 10,
+          "30": 11
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      },
+      "test": {
+        "available_gallery_records": 7,
+        "eligible_query_records": 7,
+        "eligible_patterns": 2,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 6,
+          "30": 6
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.41666666666666663,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.4047619047619047,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      }
+    },
+    "v11": {
+      "name": "V1.1 per-record quality gates",
+      "parameter_count": 1025418,
+      "selected_epoch": 9,
+      "epochs_executed": 14,
+      "validation_selection_ndcg_at_30": 1.0,
+      "validation": {
+        "available_gallery_records": 12,
+        "eligible_query_records": 12,
+        "eligible_patterns": 3,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 10,
+          "30": 11
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      },
+      "test": {
+        "available_gallery_records": 7,
+        "eligible_query_records": 7,
+        "eligible_patterns": 2,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 6,
+          "30": 6
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.41666666666666663,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.4047619047619047,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      }
+    },
+    "v2": {
+      "name": "V2 self-attention",
+      "parameter_count": 1158538,
+      "selected_epoch": 2,
+      "epochs_executed": 7,
+      "validation_selection_ndcg_at_30": 1.0,
+      "validation": {
+        "available_gallery_records": 12,
+        "eligible_query_records": 12,
+        "eligible_patterns": 3,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 10,
+          "30": 11
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.3333333333333333,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      },
+      "test": {
+        "available_gallery_records": 7,
+        "eligible_query_records": 7,
+        "eligible_patterns": 2,
+        "self_match_removed": true,
+        "requested_k_values": [
+          1,
+          5,
+          10,
+          30
+        ],
+        "effective_k_values": {
+          "1": 1,
+          "5": 5,
+          "10": 6,
+          "30": 6
+        },
+        "ap_convention": "truncated_denominator_min_relevant_k",
+        "pattern_macro": {
+          "RECALL@1": 0.41666666666666663,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        },
+        "query_micro": {
+          "RECALL@1": 0.4047619047619047,
+          "NDCG@1": 1.0,
+          "AP@1": 1.0,
+          "RECALL@5": 1.0,
+          "NDCG@5": 1.0,
+          "AP@5": 1.0,
+          "RECALL@10": 1.0,
+          "NDCG@10": 1.0,
+          "AP@10": 1.0,
+          "RECALL@30": 1.0,
+          "NDCG@30": 1.0,
+          "AP@30": 1.0
+        }
+      }
+    }
+  },
+  "mask_only": {
+    "validation": {
+      "available_gallery_records": 12,
+      "eligible_query_records": 12,
+      "eligible_patterns": 3,
+      "self_match_removed": true,
+      "requested_k_values": [
+        1,
+        5,
+        10,
+        30
+      ],
+      "effective_k_values": {
+        "1": 1,
+        "5": 5,
+        "10": 10,
+        "30": 11
+      },
+      "ap_convention": "truncated_denominator_min_relevant_k",
+      "pattern_macro": {
+        "RECALL@1": 0.027777777777777776,
+        "NDCG@1": 0.08333333333333333,
+        "AP@1": 0.08333333333333333,
+        "RECALL@5": 0.3611111111111111,
+        "NDCG@5": 0.2632743662161801,
+        "AP@5": 0.14212962962962963,
+        "RECALL@10": 0.9166666666666666,
+        "NDCG@10": 0.5093688365280017,
+        "AP@10": 0.30405643738977073,
+        "RECALL@30": 1.0,
+        "NDCG@30": 0.542094334070051,
+        "AP@30": 0.32678371011704344
+      },
+      "query_micro": {
+        "RECALL@1": 0.027777777777777776,
+        "NDCG@1": 0.08333333333333333,
+        "AP@1": 0.08333333333333333,
+        "RECALL@5": 0.3611111111111111,
+        "NDCG@5": 0.2632743662161802,
+        "AP@5": 0.14212962962962963,
+        "RECALL@10": 0.9166666666666665,
+        "NDCG@10": 0.5093688365280017,
+        "AP@10": 0.3040564373897707,
+        "RECALL@30": 1.0,
+        "NDCG@30": 0.5420943340700509,
+        "AP@30": 0.3267837101170434
+      }
+    },
+    "test": {
+      "available_gallery_records": 7,
+      "eligible_query_records": 7,
+      "eligible_patterns": 2,
+      "self_match_removed": true,
+      "requested_k_values": [
+        1,
+        5,
+        10,
+        30
+      ],
+      "effective_k_values": {
+        "1": 1,
+        "5": 5,
+        "10": 6,
+        "30": 6
+      },
+      "ap_convention": "truncated_denominator_min_relevant_k",
+      "pattern_macro": {
+        "RECALL@1": 0.25,
+        "NDCG@1": 0.6666666666666666,
+        "AP@1": 0.6666666666666666,
+        "RECALL@5": 0.9166666666666667,
+        "NDCG@5": 0.7573488167274481,
+        "AP@5": 0.6625,
+        "RECALL@10": 1.0,
+        "NDCG@10": 0.7937500561971422,
+        "AP@10": 0.6902777777777778,
+        "RECALL@30": 1.0,
+        "NDCG@30": 0.7937500561971422,
+        "AP@30": 0.6902777777777778
+      },
+      "query_micro": {
+        "RECALL@1": 0.2619047619047619,
+        "NDCG@1": 0.7142857142857143,
+        "AP@1": 0.7142857142857143,
+        "RECALL@5": 0.9285714285714286,
+        "NDCG@5": 0.78530080259029,
+        "AP@5": 0.6968253968253968,
+        "RECALL@10": 1.0,
+        "NDCG@10": 0.8165018649928849,
+        "AP@10": 0.7206349206349206,
+        "RECALL@30": 1.0,
+        "NDCG@30": 0.8165018649928849,
+        "AP@30": 0.7206349206349206
+      }
+    }
+  },
+  "selection_metric": "validation pattern-macro NDCG@30",
+  "all_missing_record_id": "record_00048",
+  "attention_example_record_id": "record_00036",
+  "figures": [
+    "figures/training.png",
+    "figures/validation_selection.png",
+    "figures/gates_v1.png",
+    "figures/gates_v11.png",
+    "figures/gates_v2.png",
+    "figures/attention_v2.png"
+  ]
+}

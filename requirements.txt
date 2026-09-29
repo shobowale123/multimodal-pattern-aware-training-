@@ -1,0 +1,12 @@
+# Install CPU PyTorch first; see README for the platform-specific command.
+numpy==2.2.4
+pandas==2.2.3
+torch==2.6.0
+matplotlib==3.10.1
+nbformat==5.10.4
+nbclient==0.10.2
+ipykernel==6.29.5
+jupyterlab==4.3.6
+pytest==8.3.5
+build==1.2.2.post1
+-e .

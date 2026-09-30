@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 import torch.nn.functional as functional
-from .config import FusionConfig, MODALITY_ORDER, MODALITY_DIMENSIONS, ADAPTER_HIDDEN_DIMENSIONS
-from .data import UnifiedInputs
+from .config import FusionConfig, MODALITY_ORDER, ADAPTER_HIDDEN_DIMENSIONS
+from .data import FeatureInputs
 DEVICE = torch.device('cpu')
 
 class ModalityAdapter(nn.Module):
@@ -62,7 +62,7 @@ class FiveModalityConcatFusionEncoder(nn.Module):
         self.adapters = nn.ModuleDict(
             {
                 name: ModalityAdapter(
-                    MODALITY_DIMENSIONS[name],
+                    config.input_dimensions[name],
                     ADAPTER_HIDDEN_DIMENSIONS[name],
                     config.adapter_dimension,
                 )
@@ -174,7 +174,7 @@ class FiveTokenSelfAttentionFusionEncoder(nn.Module):
         self.adapters = nn.ModuleDict(
             {
                 name: ModalityAdapter(
-                    MODALITY_DIMENSIONS[name],
+                    config.input_dimensions[name],
                     ADAPTER_HIDDEN_DIMENSIONS[name],
                     config.adapter_dimension,
                 )
@@ -257,7 +257,7 @@ class FiveTokenSelfAttentionFusionEncoder(nn.Module):
 
 
 def tensor_batch(
-    aligned_inputs: UnifiedInputs,
+    aligned_inputs: FeatureInputs,
     indices: Sequence[int] | np.ndarray,
     *,
     device: torch.device = DEVICE,

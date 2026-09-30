@@ -1,48 +1,68 @@
-# Reproduce the experiment
+# Reproducibility and verification
 
 ## Environment
 
-The reference run was generated on Windows, CPU, Python 3.12.14, PyTorch 2.6.0+cpu, NumPy 2.2.4, pandas 2.2.3, and Matplotlib 3.10.1. The README's setup uses an isolated virtual environment. `requirements.txt` pins the direct dependencies; `environment-tested.txt` records installed transitive versions without local paths. The latter is an informational Windows snapshot, not a cross-platform lockfile.
+The original reference run was generated on Windows, CPU, Python 3.12.14, PyTorch 2.6.0+cpu, NumPy 2.2.4, pandas 2.2.3, and Matplotlib 3.10.1. `requirements.txt` pins direct development/demo dependencies; `environment-tested.txt` records the historical Windows transitive versions without local paths. That snapshot is not a cross-platform lockfile.
 
-The source notebook's saved output used Python 3.13.5 and PyTorch 2.10.0+cpu. We separately replayed its code in the reference environment to compare the public refactor with the source. Historical outputs and freshly generated results are distinguished in [source assessment](source-assessment.md).
+The original source notebook's saved output used Python 3.13.5 and PyTorch 2.10.0+cpu. Its separately reported replay in the reference environment is distinguished from historical saved output in [source assessment](source-assessment.md). The new own-data lifecycle does not regenerate or replace those historical notebook results.
 
-## Commands
+## Original synthetic experiment
 
 After installation, run from the repository root:
 
 ```bash
 python -m pattern_aware --config configs/demo.json --output artifacts/demo
 python -m pytest
-python scripts/execute_notebook.py
 ```
 
-The final command executes the clean notebook from a fresh kernel and replaces `notebooks/02_pattern_aware_training_results.ipynb`. It removes execution timing metadata while preserving synthetic tables and figures. It fails on a cell error rather than silently saving partial output.
-
-To deliberately refresh checked-in examples:
+Notebook execution remains a separate local operation:
 
 ```bash
-python -m pattern_aware --config configs/demo.json --output examples/reference_run
 python scripts/execute_notebook.py
 ```
 
-Refresh the prose in `docs/results.md` if the metrics, configuration, or environment changes. Review the resulting diff before sharing it.
+That command executes the clean notebook from a fresh kernel and replaces `notebooks/02_pattern_aware_training_results.ipynb`. It removes execution timing metadata and fails on a cell error. To deliberately refresh the tracked examples as well, run the demo with `--output examples/reference_run`, then regenerate the results notebook and review the resulting diffs. Update [results](results.md) if settings, metrics, or environment change.
 
-## Artifacts
+Each synthetic comparison records effective configuration, environment, metrics, history, gate/attention diagnostics, rankings, embeddings, and figures. Checkpoints are off by default. Its `--save-checkpoints` option writes bare selected state dictionaries, not the versioned own-data bundle.
 
-Each run records the effective configuration, environment, metrics, training history, gates, ranked candidates, and figures. `summary.json` contains validation and test summaries for each model plus the mask-only control. Per-query and per-pattern CSV files expose the aggregation behind those summaries. `embeddings.npz` stores synthetic embeddings. No trained checkpoint is saved by default; enable `save_checkpoints` explicitly to retain weights in an ignored artifact directory.
+## Own-data lifecycle
 
-Runtime outputs under `artifacts/` are ignored by Git. Only the deliberately generated `examples/reference_run/` results are tracked. Checkpoints, virtual environments, caches, environment secrets, and raw/private data directories are excluded by `.gitignore`.
+The [own-data guide](own-data.md) documents the external-file schema and commands. A local synthetic fixture exercises those commands without using the demo experiment runner:
 
-## Determinism and comparison
+```bash
+python scripts/make_external_fixture.py --output artifacts/fixture
+python -m pattern_aware validate --data artifacts/fixture/dataset/manifest.json
+python -m pattern_aware train --data artifacts/fixture/dataset/manifest.json --config artifacts/fixture/train.json --output artifacts/model
+python -m pattern_aware encode --checkpoint artifacts/model/best --data artifacts/fixture/queries/manifest.json --output artifacts/queries.npz
+python -m pattern_aware encode --checkpoint artifacts/model/best --data artifacts/fixture/gallery/manifest.json --output artifacts/gallery.npz
+python -m pattern_aware retrieve --queries artifacts/queries.npz --gallery artifacts/gallery.npz --top-k 10 --output artifacts/rankings.csv
+python -m pattern_aware evaluate --checkpoint artifacts/model/best --data artifacts/fixture/dataset/manifest.json --split test --output artifacts/test.json
+```
 
-The package seeds Python, NumPy and PyTorch, enables deterministic PyTorch algorithms, and uses one CPU thread by default. Each model starts from the same seed and receives the same sampler schedule. The synthetic generator preserves the source random-draw order. Record IDs were renamed without changing their sort order.
+Use fresh output paths when rerunning; public own-data commands refuse overwrites. A training run saves effective settings, selection/audit summary, history, and the best self-describing weight bundle automatically. Encoding and retrieval occur in separate processes and require no training labels. Test evaluation is a separate command.
 
-Within the same environment, repeated experiments should reproduce histories and metrics. Exact floating-point values may differ across operating systems, CPU libraries, Python/dependency versions, and thread settings. Architectures differ in parameter count and initialization consumption, so the same seed is not a claim of identical initial representations.
+The fixture is deliberately small and synthetic. It verifies software behavior without measuring real-data accuracy, serving latency, robustness under distribution shift, or operational readiness.
 
-Synthetic data creation, model fitting, retrieval, and plot generation use no external data services. Installing dependencies requires network access unless wheels are already cached. GitHub Actions is configured to run tests and the default CPU experiment; local validation is separate from any future hosted CI run.
+## Hosted CI
 
-## Configuration boundaries
+[GitHub Actions run 36621194783](https://github.com/shobowale123/multimodal-pattern-aware-training-/actions/runs/36621194783) passed on 2026-09-29 at commit `3ceccdb3f036eeb63a0a376231baeff9ae86e18b`: 37 tests and one default CPU comparison covering V1, V1.1, and V2. That historical workflow did not execute notebooks, test own-data checkpoint reload, or retain run artifacts.
 
-Edit `configs/demo.json` to change the seed, optimizer policy, fixed members per pattern, selected variants, retrieval cutoffs, plots, or checkpoint saving. The 12-pattern, four-member cohort and modality dimensions intentionally preserve the source experiment. Generating a larger or harder benchmark requires extending the generator, not merely increasing epochs.
+The updated [workflow](../.github/workflows/ci.yml) is configured to:
 
-Checkpoint selection always uses validation pattern-macro NDCG@30, even if reporting cutoffs are changed. Test metrics must not guide tuning. The package validates settings and raises an explicit error when the cohort cannot support the requested batch or retrieval protocol.
+1. Run the mathematical and lifecycle tests on Python 3.11 and 3.12 with CPU PyTorch 2.6.0.
+2. Run the unchanged default synthetic comparison.
+3. Build a wheel and install it in a separate environment.
+4. Verify that the imported package comes from that installation, then run validation, training, fresh-process encoding, retrieval, and held-out evaluation from a working directory outside the source tree.
+5. Retain only synthetic summaries, effective configurations, histories, rankings, evaluation reports, test results, and an installed-environment listing. Weights and input/embedding NPZ files are not uploaded.
+
+See the [Actions tab](https://github.com/shobowale123/multimodal-pattern-aware-training-/actions) for the result associated with a particular commit. A configured step is not evidence that it passed; check the exact commit and completed job logs. Notebook execution remains separate and is not claimed as CI coverage.
+
+## Determinism and selection
+
+The package seeds Python, NumPy, and PyTorch, enables deterministic PyTorch algorithms, and defaults to one CPU thread. The synthetic comparison shares the same seed and sampler policy across variants. An own-data run selects one variant; its schema and effective settings are saved with the selected model.
+
+Within the same environment, repeated experiments should reproduce histories and metrics. Floating-point values may differ across operating systems, CPU libraries, dependency versions, and thread settings. Different architectures consume initialization randomness differently, so a shared seed does not imply identical initial representations.
+
+The original demo selects validation pattern-macro NDCG@30. Own-data training exposes `selection_k`, still using only validation pattern-macro NDCG. Never use test results to choose preprocessing, hyperparameters, architecture, or epoch. The saved bundle does not contain the optimizer/RNG state required for exact interrupted-training resume.
+
+Installing dependencies needs network access unless wheels are cached. Training, encoding, retrieval, and evaluation do not use external data services. Keep own-data artifacts outside version control; the repository ignores `artifacts/`, `runs/`, and `data/`. Configure version-control exclusions before choosing other local output paths.

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multimodal-pattern-aware-training"
-version = "0.1.0"
-description = "Reproducible synthetic multimodal retrieval with pattern-balanced contrastive training"
+version = "0.2.0"
+description = "Pattern-balanced multimodal retrieval training and inference on precomputed embeddings"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

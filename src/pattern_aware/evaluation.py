@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from .config import ContractError
 from .data import unit_rows
+from .retrieval import top_k_indices
 
 @dataclass(frozen=True)
 class RetrievalEvaluation:
@@ -20,6 +21,8 @@ def evaluate_retrieval(
     record_ids: Sequence[object],
     available: Sequence[bool] | np.ndarray,
     k_values: Iterable[int] = (1, 5, 10, 30),
+    query_chunk_size: int = 128,
+    gallery_chunk_size: int = 1024,
 ) -> RetrievalEvaluation:
     matrix = np.asarray(embeddings, dtype="float32")
     labels = np.asarray([str(v) for v in pattern_ids], dtype=object)
@@ -56,12 +59,17 @@ def evaluate_retrieval(
     maximum_k = min(max(ks), matrix.shape[0] - 1)
     records: list[dict[str, Any]] = []
 
-    scores = matrix[query_indices] @ matrix.T
-    scores[np.arange(len(query_indices)), query_indices] = -np.inf
+    ranking = top_k_indices(
+        matrix[query_indices], matrix,
+        query_ids=identifiers[query_indices], gallery_ids=identifiers,
+        query_available=np.ones(len(query_indices), dtype=bool),
+        gallery_available=np.ones(len(matrix), dtype=bool),
+        top_k=maximum_k, query_chunk_size=query_chunk_size,
+        gallery_chunk_size=gallery_chunk_size,
+    )
 
     for local_position, query_index in enumerate(query_indices):
-        order = np.lexsort((identifiers, -scores[local_position]))
-        ranked = order[:maximum_k]
+        ranked = ranking.indices[local_position]
         query_label = labels[query_index]
         relevance = labels[ranked] == query_label
         total_relevant = int(group_counts[query_label] - 1)

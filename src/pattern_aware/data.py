@@ -1,16 +1,24 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field, replace
 from typing import Mapping, Sequence, Any
 import math
 import numpy as np
 import pandas as pd
-from .config import ContractError, MODALITY_ORDER, MODALITY_DIMENSIONS, QUALITY_FIELD_NAMES
+from .config import ContractError, FeatureSchema, MODALITY_ORDER, MODALITY_DIMENSIONS, QUALITY_FIELD_NAMES
 
 @dataclass(frozen=True)
 class ModalityIdentity:
     name: str
     version: str
     dimension: int
+
+    def __post_init__(self) -> None:
+        if self.name not in MODALITY_ORDER:
+            raise ContractError(f"Unknown modality: {self.name}")
+        if not isinstance(self.version, str) or not self.version.strip():
+            raise ContractError("Encoder version must be a nonempty string")
+        if isinstance(self.dimension, bool) or not isinstance(self.dimension, int) or self.dimension < 1:
+            raise ContractError("Encoder dimension must be a positive integer")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -31,21 +39,24 @@ class ModalityArtifact:
         n = len(self.record_ids)
         if self.name not in MODALITY_ORDER:
             raise ContractError(f"Unknown modality: {self.name}")
-        if len(set(self.record_ids)) != n or any(not isinstance(v, str) or not v for v in self.record_ids):
+        if any(not isinstance(v, str) or not v.strip() for v in self.record_ids) or len(set(self.record_ids)) != n:
             raise ContractError("Artifact record identifiers must be unique nonempty strings")
-        if self.matrix.shape != (n, MODALITY_DIMENSIONS[self.name]):
+        if self.matrix.shape != (n, self.identity.dimension):
             raise ContractError(f"Invalid {self.name} embedding matrix shape")
         if self.quality.shape != (n, len(self.quality_names)):
             raise ContractError(f"Invalid {self.name} quality matrix shape")
-        if len(self.quality_names) != 1:
-            raise ContractError("Synthetic artifacts require one quality field")
+        if (len(self.quality_names) not in (0, 1)
+                or any(not isinstance(v, str) or not v.strip() for v in self.quality_names)):
+            raise ContractError("Artifacts require zero or one named quality field")
+        if self.matrix.dtype.kind != "f" or self.quality.dtype.kind != "f":
+            raise ContractError("Embeddings and quality must use floating dtypes")
         for mask in (self.content_available, self.source_available):
             if mask.shape != (n,) or mask.dtype != np.bool_:
                 raise ContractError("Artifact availability masks must be Boolean vectors")
         if not np.isfinite(self.matrix).all() or not np.isfinite(self.quality).all():
             raise ContractError("Artifacts must contain only finite numbers")
         if np.any((self.quality < 0) | (self.quality > 1)):
-            raise ContractError("Synthetic quality must be in [0, 1]")
+            raise ContractError("Quality must be in [0, 1]")
         if np.any(self.content_available & ~self.source_available):
             raise ContractError("Content cannot be available without a source")
         if self.identity.name != self.name or self.identity.dimension != self.matrix.shape[1]:
@@ -65,7 +76,9 @@ def unit_rows(values: np.ndarray) -> np.ndarray:
 
 
 @dataclass(frozen=True)
-class UnifiedInputs:
+class FeatureInputs:
+    """Aligned precomputed features; no labels are needed for inference."""
+
     record_ids: tuple[str, ...]
     matrices: Mapping[str, np.ndarray]
     content_masks: np.ndarray
@@ -73,15 +86,18 @@ class UnifiedInputs:
     qualities: Mapping[str, np.ndarray]
     quality_names: Mapping[str, tuple[str, ...]]
     identities: Mapping[str, ModalityIdentity]
-    pattern_ids: tuple[str, ...]
-    splits: tuple[str, ...]
+    schema_metadata: FeatureSchema | None = field(default=None, kw_only=True, repr=False)
+    _quality_removed: bool = field(default=False, kw_only=True, repr=False)
 
     def __post_init__(self) -> None:
         n = len(self.record_ids)
-        if len(set(self.record_ids)) != n:
-            raise ContractError("Aligned record identifiers must be unique")
-        if len(self.pattern_ids) != n or len(self.splits) != n:
-            raise ContractError("Aligned labels and splits must match the record count")
+        if self.schema_metadata is not None and not isinstance(self.schema_metadata, FeatureSchema):
+            raise ContractError("schema_metadata must be a FeatureSchema")
+        if not isinstance(self._quality_removed, bool):
+            raise ContractError("_quality_removed must be Boolean")
+        if (any(not isinstance(v, str) or not v.strip() for v in self.record_ids)
+                or len(set(self.record_ids)) != n):
+            raise ContractError("Aligned record identifiers must be unique nonempty strings")
         for masks, width in ((self.content_masks, 5), (self.source_masks, 2)):
             if masks.shape != (n, width) or masks.dtype != np.bool_:
                 raise ContractError("Aligned masks have invalid shape or non-Boolean dtype")
@@ -91,19 +107,44 @@ class UnifiedInputs:
             if set(mapping) != set(MODALITY_ORDER):
                 raise ContractError("Exactly five named modalities are required")
         for name in MODALITY_ORDER:
-            if self.matrices[name].shape != (n, MODALITY_DIMENSIONS[name]):
+            identity = self.identities[name]
+            if not isinstance(identity, ModalityIdentity) or identity.name != name:
+                raise ContractError(f"Invalid aligned {name} encoder identity")
+            if self.matrices[name].shape != (n, identity.dimension):
                 raise ContractError(f"Invalid aligned {name} matrix shape")
             if self.qualities[name].shape != (n, len(self.quality_names[name])):
                 raise ContractError(f"Invalid aligned {name} quality shape")
+            if self.matrices[name].dtype.kind != "f" or self.qualities[name].dtype.kind != "f":
+                raise ContractError("Aligned embeddings and quality must use floating dtypes")
             if not np.isfinite(self.matrices[name]).all() or not np.isfinite(self.qualities[name]).all():
                 raise ContractError("Aligned values must be finite")
-        memberships: dict[str, str] = {}
-        for label, split in zip(self.pattern_ids, self.splits, strict=True):
-            if split not in {"train", "validation", "test"}:
-                raise ContractError(f"Unknown split: {split}")
-            if label in memberships and memberships[label] != split:
-                raise ContractError("A pattern cannot appear in more than one split")
-            memberships[label] = split
+            if np.any(np.abs(self.matrices[name]) > np.finfo(np.float32).max):
+                raise ContractError("Aligned embeddings must fit the float32 model input range")
+            if np.any((self.qualities[name] < 0) | (self.qualities[name] > 1)):
+                raise ContractError("Quality must be in [0, 1]")
+        actual_schema = FeatureSchema(
+            dimensions={name: self.identities[name].dimension for name in MODALITY_ORDER},
+            encoder_versions={name: self.identities[name].version for name in MODALITY_ORDER},
+            quality_names=self.quality_names,
+            normalization=self.schema_metadata.normalization if self.schema_metadata else "none",
+        )
+        if self.schema_metadata is not None:
+            expected = self.schema_metadata
+            if self._quality_removed:
+                if any(self.quality_names[name] for name in MODALITY_ORDER):
+                    raise ContractError("A quality-free view must have zero quality fields")
+                expected = replace(expected, quality_names={name: () for name in MODALITY_ORDER})
+            expected.assert_compatible(actual_schema)
+
+    @property
+    def schema(self) -> FeatureSchema:
+        if self.schema_metadata is not None:
+            return self.schema_metadata
+        return FeatureSchema(
+            dimensions={name: self.identities[name].dimension for name in MODALITY_ORDER},
+            encoder_versions={name: self.identities[name].version for name in MODALITY_ORDER},
+            quality_names=self.quality_names,
+        )
 
     @property
     def eligible(self) -> np.ndarray:
@@ -114,36 +155,38 @@ class UnifiedInputs:
         weights = (1 << np.arange(len(MODALITY_ORDER), dtype=np.uint8)).reshape(1, -1)
         return (self.content_masks.astype(np.uint8) * weights).sum(axis=1).astype(np.uint8)
 
-    def subset(self, indices: Sequence[int] | np.ndarray) -> "UnifiedInputs":
-        selected = np.asarray(indices, dtype=np.int64)
+    def subset(self, indices: Sequence[int] | np.ndarray) -> "FeatureInputs":
+        selected = np.asarray(indices)
+        if selected.size and selected.dtype.kind not in {"i", "u"}:
+            raise ContractError("Subset indices must be integer row positions")
+        selected = selected.astype(np.int64)
         if selected.ndim != 1 or np.any(selected < 0) or np.any(selected >= len(self.record_ids)):
             raise ContractError("Subset indices must be a vector of valid row positions")
-        return UnifiedInputs(
+        updates: dict[str, Any] = {}
+        if isinstance(self, UnifiedInputs):
+            updates = {
+                "pattern_ids": tuple(self.pattern_ids[i] for i in selected),
+                "splits": tuple(self.splits[i] for i in selected),
+                "group_ids": None if self.group_ids is None else tuple(self.group_ids[i] for i in selected),
+            }
+        return replace(self,
             record_ids=tuple(self.record_ids[i] for i in selected),
             matrices={name: values[selected] for name, values in self.matrices.items()},
             content_masks=self.content_masks[selected],
             source_masks=self.source_masks[selected],
             qualities={name: values[selected] for name, values in self.qualities.items()},
-            quality_names=self.quality_names,
-            identities=self.identities,
-            pattern_ids=tuple(self.pattern_ids[i] for i in selected),
-            splits=tuple(self.splits[i] for i in selected),
+            **updates,
         )
 
-    def without_quality(self) -> "UnifiedInputs":
+    def without_quality(self) -> "FeatureInputs":
         rows = len(self.record_ids)
-        return UnifiedInputs(
-            record_ids=self.record_ids,
-            matrices=self.matrices,
-            content_masks=self.content_masks,
-            source_masks=self.source_masks,
+        return replace(self,
             qualities={
                 name: np.empty((rows, 0), dtype="float32") for name in MODALITY_ORDER
             },
             quality_names={name: () for name in MODALITY_ORDER},
-            identities=self.identities,
-            pattern_ids=self.pattern_ids,
-            splits=self.splits,
+            schema_metadata=self.schema,
+            _quality_removed=True,
         )
 
     def audit(self) -> Mapping[str, Any]:
@@ -165,6 +208,40 @@ class UnifiedInputs:
                 for code, count in zip(codes, counts, strict=True)
             },
         }
+
+
+@dataclass(frozen=True)
+class UnifiedInputs(FeatureInputs):
+    """Features plus pattern labels and globally disjoint split membership."""
+
+    pattern_ids: tuple[str, ...]
+    splits: tuple[str, ...]
+    group_ids: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        n = len(self.record_ids)
+        if len(self.pattern_ids) != n or len(self.splits) != n:
+            raise ContractError("Aligned labels and splits must match the record count")
+        if self.group_ids is not None and len(self.group_ids) != n:
+            raise ContractError("Group IDs must match the record count")
+        memberships: dict[str, str] = {}
+        groups: dict[str, str] = {}
+        for row, (label, split) in enumerate(zip(self.pattern_ids, self.splits, strict=True)):
+            if not isinstance(label, str) or not label.strip():
+                raise ContractError("Pattern IDs must be nonempty strings")
+            if split not in {"train", "validation", "test"}:
+                raise ContractError(f"Unknown split: {split}")
+            if label in memberships and memberships[label] != split:
+                raise ContractError("A pattern cannot appear in more than one split")
+            memberships[label] = split
+            if self.group_ids is not None:
+                group = self.group_ids[row]
+                if not isinstance(group, str) or not group.strip():
+                    raise ContractError("Group IDs must be nonempty strings")
+                if group in groups and groups[group] != split:
+                    raise ContractError("A group cannot appear in more than one split")
+                groups[group] = split
 
 
 def align_modalities(
@@ -193,8 +270,8 @@ def align_modalities(
         if artifact.name != name or set(artifact.record_ids) != set(record_ids):
             raise ContractError(f"{name} artifact does not match cohort identifiers")
         index = artifact.index
-        matrix = np.zeros((row_count, MODALITY_DIMENSIONS[name]), dtype="float32")
-        quality = np.zeros((row_count, 1), dtype="float32")
+        matrix = np.zeros((row_count, artifact.identity.dimension), dtype="float32")
+        quality = np.zeros((row_count, len(artifact.quality_names)), dtype="float32")
 
         for target_row, record_id in enumerate(record_ids):
             source_row = index[record_id]

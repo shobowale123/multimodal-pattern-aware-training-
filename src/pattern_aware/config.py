@@ -42,6 +42,61 @@ QUALITY_FIELD_NAMES: Mapping[str, str] = {
 }
 
 
+def _modality_mapping(name: str, values: Mapping[str, Any]) -> None:
+    if not isinstance(values, Mapping) or set(values) != set(MODALITY_ORDER):
+        raise ContractError(f"{name} must contain exactly the five named modalities")
+
+
+@dataclass(frozen=True)
+class FeatureSchema:
+    """Identity of precomputed inputs, including preprocessing applied on load."""
+
+    dimensions: Mapping[str, int]
+    encoder_versions: Mapping[str, str]
+    quality_names: Mapping[str, tuple[str, ...]]
+    normalization: str = "none"
+
+    def __post_init__(self) -> None:
+        for name in ("dimensions", "encoder_versions", "quality_names"):
+            _modality_mapping(name, getattr(self, name))
+        for role in MODALITY_ORDER:
+            _positive_integer(f"{role} dimension", self.dimensions[role])
+            version = self.encoder_versions[role]
+            if not isinstance(version, str) or not version.strip():
+                raise ContractError(f"{role} encoder version must be a nonempty string")
+            names = self.quality_names[role]
+            if (not isinstance(names, (tuple, list)) or len(names) not in (0, 1)
+                    or any(not isinstance(value, str) or not value.strip() for value in names)):
+                raise ContractError(f"{role} quality_names must contain zero or one nonempty name")
+        if not isinstance(self.normalization, str) or self.normalization not in {"none", "l2"}:
+            raise ContractError("normalization must be 'none' or 'l2'")
+        # Own copies keep later mutations of caller dictionaries from changing the contract.
+        object.__setattr__(self, "dimensions", dict(self.dimensions))
+        object.__setattr__(self, "encoder_versions", dict(self.encoder_versions))
+        object.__setattr__(self, "quality_names", {
+            role: tuple(self.quality_names[role]) for role in MODALITY_ORDER
+        })
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dimensions": dict(self.dimensions),
+            "encoder_versions": dict(self.encoder_versions),
+            "quality_names": {role: list(self.quality_names[role]) for role in MODALITY_ORDER},
+            "normalization": self.normalization,
+        }
+
+    @classmethod
+    def from_dict(cls, values: Mapping[str, Any]) -> "FeatureSchema":
+        required = {"dimensions", "encoder_versions", "quality_names", "normalization"}
+        if not isinstance(values, Mapping) or set(values) != required:
+            raise ContractError(f"Feature schema requires exactly: {sorted(required)}")
+        return cls(**values)
+
+    def assert_compatible(self, other: "FeatureSchema") -> None:
+        if not isinstance(other, FeatureSchema) or self.to_dict() != other.to_dict():
+            raise ContractError("Feature schema mismatch: dimensions, encoder versions, quality definitions, and normalization must match")
+
+
 @dataclass(frozen=True)
 class FusionConfig:
     name: str
@@ -52,16 +107,21 @@ class FusionConfig:
     dropout: float = 0.0
     attention_heads: int = 4
     attention_feedforward_dimension: int = 256
+    input_dimensions: Mapping[str, int] = field(default_factory=lambda: dict(MODALITY_DIMENSIONS))
 
     def __post_init__(self) -> None:
-        if self.quality_dimension not in (0, 1):
-            raise ContractError("Synthetic quality width must be 0 or 1")
+        if type(self.quality_dimension) is not int or self.quality_dimension not in (0, 1):
+            raise ContractError("Quality width must be 0 or 1")
+        _modality_mapping("input_dimensions", self.input_dimensions)
+        for name, dimension in self.input_dimensions.items():
+            _positive_integer(f"{name} input dimension", dimension)
+        object.__setattr__(self, "input_dimensions", dict(self.input_dimensions))
         for name in ("adapter_dimension", "fusion_hidden_dimension", "output_dimension",
                      "attention_heads", "attention_feedforward_dimension"):
             _positive_integer(name, getattr(self, name))
         if self.adapter_dimension % self.attention_heads:
             raise ContractError("adapter_dimension must be divisible by attention_heads")
-        if not isinstance(self.dropout, (int, float)) or not 0 <= self.dropout < 1:
+        if isinstance(self.dropout, bool) or not isinstance(self.dropout, (int, float)) or not 0 <= self.dropout < 1:
             raise ContractError("dropout must be in [0, 1)")
 
     @property

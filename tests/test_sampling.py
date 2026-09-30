@@ -66,3 +66,26 @@ def test_sampler_rejects_implicit_boolean_masks_and_insufficient_patterns():
         PatternBalancedBatchSampler(["a", "a", "b", "b"], [1, 1, 1, 1])
     with pytest.raises(ContractError):
         PatternBalancedBatchSampler(["a", "a", "b"], np.ones(3, dtype=bool))
+
+
+@pytest.mark.parametrize("members", [2, 3, 4])
+def test_fixed_k_with_unequal_group_sizes_and_exclusion_audit(members):
+    labels = [f"group-{size}" for size in range(1, 9) for _ in range(size)]
+    available = np.ones(len(labels), dtype=bool)
+    available[-1] = False
+    sampler = PatternBalancedBatchSampler(labels, available, patterns_per_batch=2,
+                                         members_per_pattern=members, seed=23)
+    expected = {label for label, count in Counter(np.asarray(labels)[available]).items() if count >= members}
+    batches = list(sampler)
+    seen = []
+    for batch in batches:
+        counts = Counter(labels[i] for i in batch)
+        assert len(counts) >= 2
+        assert set(counts.values()) == {members}
+        assert len(batch) == len(set(batch))
+        assert all(available[batch])
+        seen.extend(counts)
+    assert set(seen) == expected
+    assert len(seen) == len(expected)
+    assert len(batches) == len(sampler)
+    assert sampler.audit.ineligible_patterns == 8 - len(expected)

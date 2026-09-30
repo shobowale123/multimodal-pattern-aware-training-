@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import Tensor, nn
-from .config import ContractError, TrainingConfig
+from .config import ContractError, TrainingConfig, _positive_integer
 from .data import UnifiedInputs
 from .models import tensor_batch, count_trainable_parameters, FusionDiagnostics
 from .sampling import PatternBalancedBatchSampler
@@ -104,16 +104,18 @@ def epoch_loss(
 def validation_selection_metric(
     model: nn.Module,
     aligned_inputs: UnifiedInputs,
+    selection_k: int = 30,
 ) -> tuple[float, RetrievalEvaluation]:
+    _positive_integer("selection_k", selection_k)
     vectors = encode_all(model, aligned_inputs)
     result = evaluate_retrieval(
         vectors,
         aligned_inputs.pattern_ids,
         record_ids=aligned_inputs.record_ids,
         available=aligned_inputs.eligible,
-        k_values=(30,),
+        k_values=(selection_k,),
     )
-    return float(result.summary["pattern_macro"]["NDCG@30"]), result
+    return float(result.summary["pattern_macro"][f"NDCG@{selection_k}"]), result
 
 
 def train_and_select(
@@ -122,7 +124,10 @@ def train_and_select(
     train_inputs: UnifiedInputs,
     validation_inputs: UnifiedInputs,
     config: TrainingConfig = TRAINING_CONFIG,
+    *,
+    selection_k: int = 30,
 ) -> TrainingRun:
+    _positive_integer("selection_k", selection_k)
     if not isinstance(config, TrainingConfig):
         raise ContractError("config must be a TrainingConfig")
     if set(train_inputs.splits) != {"train"} or set(validation_inputs.splits) != {"validation"}:
@@ -167,7 +172,10 @@ def train_and_select(
         validation_metric, validation_result = validation_selection_metric(
             model,
             validation_inputs,
+            selection_k,
         )
+        if not np.isfinite(train_loss) or not np.isfinite(validation_metric):
+            raise ContractError("Training loss and validation selection metric must stay finite")
 
         improved = validation_metric > best_metric + config.minimum_delta
         if improved:
@@ -186,7 +194,7 @@ def train_and_select(
             {
                 "epoch": epoch + 1,
                 "train_loss": train_loss,
-                "validation_pattern_macro_ndcg_at_30": validation_metric,
+                f"validation_pattern_macro_ndcg_at_{selection_k}": validation_metric,
                 "new_best": improved,
                 "patience_used": epochs_without_improvement,
             }

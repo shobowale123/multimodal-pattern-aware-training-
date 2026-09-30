@@ -1,13 +1,11 @@
 # Project summary
 
-This project implements a multimodal retrieval-training simulation in PyTorch. It combines five frozen synthetic representations into a normalized 256-dimensional embedding and compares global modality gates, per-record quality gates, and self-attention across modality tokens.
+This project implements CPU multimodal retrieval training in PyTorch. It combines five precomputed representations using global gates, per-record quality gates, or five-token self-attention followed by quality gates. The default output is a normalized 256-dimensional embedding; own-data widths and architecture dimensions are configurable.
 
-The training system constructs pattern-balanced batches so that every anchor has a related positive. A masked multi-positive supervised contrastive objective learns to cluster related records while separating allowed negative comparisons. Missing-modality masks and separate source-availability bits make the input contract explicit.
+Training constructs pattern-balanced batches with a fixed K distinct records per selected pattern. A multi-positive supervised contrastive objective learns from all non-self batch comparisons; the lower-level loss also offers an optional comparison mask. Content masks and structured source-availability bits represent missing modalities explicitly. Adaptive K is not implemented.
 
-Evaluation separates patterns across training, validation, and test. Checkpoints are selected using validation pattern-macro NDCG@30, then evaluated on the held-out test patterns. Recall, NDCG, and average precision are reported alongside per-query and per-pattern results. Gate diagnostics, attention matrices, and a mask-only negative control help inspect model behavior.
+The public own-data workflow validates a versioned manifest and ID-indexed modality files, enforces declared split/group separation, selects weights using validation pattern-macro NDCG, and saves a self-describing model bundle. A fresh process can reconstruct the model, encode unlabeled records, retrieve from a separate gallery in bounded score chunks, and evaluate a held-out split. IDs, availability, feature identities, and selected-weight identity travel with encoded outputs.
 
-The public package replaces notebook-only execution with reusable modules, validated JSON settings, a command-line entry point, clean demonstration and executed-results notebooks, regenerated example artifacts, and focused tests. It runs on CPU without private data or external services.
+The original synthetic comparison remains reproducible through its existing command and notebooks, including gate/attention diagnostics and a mask-only control. CI tests mathematical invariants, persistence/reload behavior, retrieval, and an installed-wheel lifecycle on external-format synthetic files.
 
-The 48-record synthetic cohort is intentionally small and the default retrieval task saturates. Results demonstrate the implementation and evaluation protocol; they do not establish real-world performance or a superior fusion architecture.
-
-**Portfolio summary:** Built a reproducible PyTorch multimodal retrieval simulation with custom pattern-balanced sampling, quality-aware fusion, masked supervised contrastive learning, and pattern-disjoint evaluation. Refactored exploratory notebooks into a tested package with CPU execution and reproducible diagnostics.
+The 48-record original cohort and small acceptance fixture are deliberately limited. They demonstrate working optimization and software contracts, not an advantage for attention, performance on private data, or production readiness. Raw encoders, adaptive sampling, arbitrary modality counts, GPU/distributed training, exact resume, and a serving/vector-database layer remain outside scope.

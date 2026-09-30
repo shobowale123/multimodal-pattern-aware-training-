@@ -1,15 +1,17 @@
 # Public release scope and licensing
 
-The public demo generates synthetic vectors locally. It needs no credentials, private datasets, raw reports, databases, external model downloads, or network calls during training.
+The public examples and acceptance fixture generate synthetic vectors locally. They need no credentials, private datasets, raw reports, operational databases, pretrained model downloads, or network calls during training and inference. The own-data workflow reads files supplied by the user; the package does not upload them.
 
-The public refactor replaces domain-specific record identifiers with generic synthetic record IDs and removes notebook wording that refers to internal implementations or approved production contracts. Original raw notebook outputs, execution metadata, local paths, embedded HTML, and historical images are not copied into this repository. Retained result artifacts are regenerated from the public package.
+The original public refactor replaced domain-specific record identifiers with generic synthetic IDs and omitted original raw notebook outputs, execution metadata, local paths, embedded HTML, and historical images. Retained reference artifacts were regenerated from the public package. The `suspect` and `weapon` keys preserve the two original structured channel roles; included values describe no real individuals or incidents. See [source assessment](source-assessment.md).
 
-The modality concepts and vector dimensions are retained to preserve the technical experiment. The original `suspect` and `weapon` modality keys describe simulated structured channels, not real individuals or incidents. See the [source assessment](source-assessment.md) for the exact migration scope and missing historical source.
+## User-supplied data and weights
+
+Use only data and upstream embeddings you are entitled to process. Encoder revisions, feature schemas, labels, IDs, and group boundaries are supplied by the user. The contract validates their format and declared consistency; it cannot establish source rights, eliminate semantic duplication, or prove that upstream preprocessing avoided held-out information.
+
+Keep private source files, learned weights, and derived embeddings outside public commits and logs. Model metadata includes schemas, encoder identities, training settings, and hashed split identities used to check evaluation overlap. Those hashes support identity comparisons; they are not a guarantee of anonymization. Run summaries contain aggregate counts, while retrieval/evaluation outputs contain record identifiers.
+
+The public CI upload allowlist contains only generated synthetic summaries/configurations, histories, rankings, reports, test output, and an environment listing. It excludes raw fixture arrays, encoded arrays, and trained weights. The repository ignores `artifacts/`, `runs/`, and `data/`; configure your own version-control exclusions before using other paths for private data.
 
 ## License
 
-The repository includes the [MIT license](../LICENSE) for the code and included generated examples. It does not relicense Python, PyTorch, NumPy, pandas, Matplotlib, Jupyter, or other dependencies; each retains its own license. The standard template is documented by [Choose a License](https://choosealicense.com/licenses/mit/).
-
-The code was supplied for this portfolio adaptation without an existing license header in the inspected notebooks. A filename or access to a notebook does not establish ownership. Before public release, the owner must confirm that they may distribute the source-derived implementation and apply MIT; no employer rights or third-party permissions have been inferred.
-
-The result is an educational retrieval simulation. The source domain should not be interpreted as validation for decisions about real people. No real-world operational performance, fairness, or deployment suitability was evaluated.
+The [MIT license](../LICENSE) covers the repository's code and included generated examples. It does not relicense user data, upstream encoders, trained models obtained elsewhere, or dependencies. PyTorch, NumPy, pandas, Matplotlib, Jupyter, and other dependencies retain their own licenses.

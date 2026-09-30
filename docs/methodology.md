@@ -20,6 +20,8 @@ When `P=2` leaves one pattern at the end, the reusable sampler merges it into th
 
 The supervised contrastive objective averages the negative log probability of all same-pattern positives for each anchor. Self-comparisons are removed. An optional approved-comparison mask restricts other candidates while preserving every positive. Temperature defaults to `0.07`.
 
+The public training loop does not supply that optional mask: its denominator contains every non-self batch comparison. The optional mask is a lower-level loss capability, not a learned negative-selection policy.
+
 For unit embedding `z_i`, positive set `P(i)`, and allowed non-self comparisons `A(i)`:
 
 ```text
@@ -33,9 +35,13 @@ The package validates normalized finite embeddings and positive coverage. The fo
 
 ## Training and selection
 
-All variants use AdamW, learning rate `0.001`, weight decay `0.0001`, at most 18 epochs, patience five, and minimum improvement `0.00001`. Training is deterministic on CPU within the recorded environment. The same seed and sampler policy are used for each variant. Architectures have different parameter counts; this is not a parameter-matched comparison.
+The default synthetic comparison uses AdamW, learning rate `0.001`, weight decay `0.0001`, at most 18 epochs, patience five, and minimum improvement `0.00001`. Training is deterministic on CPU within the recorded environment. The same seed and sampler policy are used for each variant. Architectures have different parameter counts; this is not a parameter-matched comparison.
 
 Checkpoint selection uses validation pattern-macro NDCG@30 only. The best weights are restored before test evaluation. The held-out test split is neither used for gradient updates nor for selecting an epoch.
+
+Own-data training preserves this protocol while exposing the validation cutoff as `selection_k`. It trains one variant, automatically saves the selected model bundle, and leaves test evaluation to a separate command. Input widths and architecture dimensions are configurable; the original experiment configuration and default mathematics are unchanged.
+
+External data must have distinct record IDs and pattern groups across splits; optional source/group IDs must also remain split-disjoint. Preprocessing and upstream trainable encoders must be fitted on training data only. Saved split-identity hashes reject known train/validation overlap during test evaluation, but cannot detect misdeclared identities, semantic duplicates, or upstream preprocessing leakage. See the [own-data contract](own-data.md).
 
 ## Retrieval protocol
 
@@ -48,5 +54,7 @@ Requested cutoffs are capped at gallery size minus one. At seed 42, validation h
 ## Controls and limits
 
 The mask-only control uses just the five content bits and two source bits. It helps detect whether availability patterns carry retrieval signal. Identifier-based tie breaking can influence this control because IDs are generated in pattern order. It is not a statistically calibrated random baseline.
+
+The own-data retrieval command supports separate query/gallery inputs with ID-based self exclusion and deterministic ties. It performs exact chunked cosine ranking; chunking limits temporary score memory, not the total comparison count. Held-out evaluation remains within-split and reports unavailable records and singleton queries separately.
 
 The saved notebook has saturated validation and test NDCG across all three trained variants. This supports execution of the shared pipeline, not an advantage for attention or learned reliability. Stronger experiments would use multiple seeds, larger galleries, an untrained/frozen-feature baseline, randomized tie handling analysis, noise/missingness sweeps, and uncertainty intervals.

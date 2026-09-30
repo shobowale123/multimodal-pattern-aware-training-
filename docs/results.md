@@ -35,11 +35,13 @@ Inspect [gate parameters](../examples/reference_run/gate_parameters.csv), [gate 
 
 ## What was verified
 
-The 37-test suite covers synthetic data generation and alignment, split separation, sampler coverage and odd-tail behavior, masked loss values and gradients, missing-modality behavior in all three encoders, hand-computed retrieval metrics, tie handling, and repeated training/checkpoint selection.
+The original 37-test suite covers synthetic data generation and alignment, split separation, sampler coverage and odd-tail behavior, masked loss values and gradients, missing-modality behavior in all three encoders, hand-computed retrieval metrics, tie handling, and repeated training/checkpoint selection. Later own-data lifecycle tests extend software coverage without changing the reference metrics above; see [reproducibility](reproducibility.md) for the current verification workflow.
 
 The public package was also compared with an independent replay of the source notebook in the same environment. Synthetic arrays, default sampler batches, model initial states and embeddings, loss gradients, complete training histories, selected epochs, and selected model tensors matched. The source comparison is a one-time extraction check; it is not part of public CI because the original notebooks are not distributed here.
 
-The clean notebook was executed from a fresh kernel to produce the results notebook. The command-line experiment also completed independently. These are local checks; the GitHub Actions workflow has not run until the repository is published and hosted CI reports its own status.
+The clean notebook execution and independent command-line run reported here were local checks. [GitHub Actions run 36621194783](https://github.com/shobowale123/multimodal-pattern-aware-training-/actions/runs/36621194783) passed on 2026-09-29 at commit `3ceccdb3f036eeb63a0a376231baeff9ae86e18b`: 37 tests and one default CPU comparison covering V1, V1.1, and V2. That hosted run did not execute notebooks, test own-data checkpoint reload/inference, or upload run artifacts. These historical local notebook/source-equivalence claims were not rerun as part of the later own-data extension.
+
+During the own-data extension, a fresh local default comparison reproduced all three checked-in training histories exactly, including selected epochs 9, 9, and 2. That regression check preserves the reference experiment; it is separate from notebook execution and does not establish own-data retrieval quality.
 
 ## Interpretation limits
 

@@ -1,4 +1,4 @@
-name: Test synthetic retrieval pipeline
+name: Test training and retrieval lifecycle
 on:
   push:
   pull_request:
@@ -9,17 +9,65 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install CPU runtime and project
         run: |
           python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
-      - name: Test
-        run: python -m pytest
-      - name: Run synthetic experiment
+      - name: Test mathematical invariants and public lifecycle
+        run: python -m pytest --junitxml=artifacts/tests.xml
+      - name: Run unchanged synthetic comparison
         run: python -m pattern_aware --config configs/demo.json --output artifacts/ci
+      - name: Build wheel and install in a separate environment
+        run: |
+          python -m build --wheel
+          python -m venv --system-site-packages "$RUNNER_TEMP/installed-env"
+          "$RUNNER_TEMP/installed-env/bin/python" -m pip install --no-deps --ignore-installed dist/*.whl
+      - name: Exercise installed wheel in fresh processes outside the source tree
+        shell: bash
+        env:
+          PYTHONPATH: ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/own-data-smoke"
+          cd "$RUNNER_TEMP/own-data-smoke"
+          runtime="$RUNNER_TEMP/installed-env/bin/python"
+          "$runtime" -c 'from pathlib import Path; import sys, pattern_aware; assert Path(pattern_aware.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()), pattern_aware.__file__'
+          "$runtime" "$GITHUB_WORKSPACE/scripts/make_external_fixture.py" --output "$GITHUB_WORKSPACE/artifacts/fixture"
+          "$runtime" -m pattern_aware validate --data "$GITHUB_WORKSPACE/artifacts/fixture/dataset/manifest.json"
+          "$runtime" -m pattern_aware train --data "$GITHUB_WORKSPACE/artifacts/fixture/dataset/manifest.json" --config "$GITHUB_WORKSPACE/artifacts/fixture/train.json" --output "$GITHUB_WORKSPACE/artifacts/own-data"
+          "$runtime" -m pattern_aware encode --checkpoint "$GITHUB_WORKSPACE/artifacts/own-data/best" --data "$GITHUB_WORKSPACE/artifacts/fixture/queries/manifest.json" --output "$GITHUB_WORKSPACE/artifacts/queries.npz" --batch-size 2
+          "$runtime" -m pattern_aware encode --checkpoint "$GITHUB_WORKSPACE/artifacts/own-data/best" --data "$GITHUB_WORKSPACE/artifacts/fixture/gallery/manifest.json" --output "$GITHUB_WORKSPACE/artifacts/gallery.npz" --batch-size 3
+          "$runtime" -m pattern_aware retrieve --queries "$GITHUB_WORKSPACE/artifacts/queries.npz" --gallery "$GITHUB_WORKSPACE/artifacts/gallery.npz" --top-k 10 --output "$GITHUB_WORKSPACE/artifacts/rankings.csv"
+          "$runtime" -m pattern_aware evaluate --checkpoint "$GITHUB_WORKSPACE/artifacts/own-data/best" --data "$GITHUB_WORKSPACE/artifacts/fixture/dataset/manifest.json" --split test --output "$GITHUB_WORKSPACE/artifacts/test.json"
+          "$runtime" -m pip freeze > "$GITHUB_WORKSPACE/artifacts/installed-environment.txt"
+      - name: Retain synthetic summaries and effective settings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-validation-python-${{ matrix.python-version }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            artifacts/tests.xml
+            artifacts/installed-environment.txt
+            artifacts/ci/config.json
+            artifacts/ci/summary.json
+            artifacts/ci/history.csv
+            artifacts/fixture/train.json
+            artifacts/own-data/config.json
+            artifacts/own-data/summary.json
+            artifacts/own-data/history.csv
+            artifacts/rankings.csv
+            artifacts/rankings.report.json
+            artifacts/test.json
+            artifacts/test.per_query.csv
+            artifacts/test.per_pattern.csv
